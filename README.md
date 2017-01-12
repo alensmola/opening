@@ -3,6 +3,8 @@
 ## Development
 
 ```bash
+# sudo ifconfig lo0 alias 10.8.8.8 netmask 255.255.255.255 up
+
 docker build -t bencinmonitor/api .
 
 ls **/*.py | entr docker run --rm -ti -e DEBUG=True -v `pwd`:/usr/src/app \
