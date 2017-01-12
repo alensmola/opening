@@ -38,12 +38,36 @@ docker run -ti --rm \
 
 ## API Endpoints
 
-```rest
+## Stations
 
+Examples:
+
+```rest
 GET /stations
 GET /stations?limit=10
 GET /stations?prices=bencin-95,bencin-100,diesel,lpg
 
-GET /
 
+GET /stations?near=Kranj
+
+GET /stations?near=Ljubljana&prices=bencin-95
+
+GET /stations?at=14.5058,46.0569
+GET /stations?near=Ljubljana&limit=30&max=10000
 ```
+
+Parameters
+
+- `at` - Coordinates that are used as starting point for search.
+- `near` - Location / address that is "geocoded" and then used as starting point.
+- `limit` - Limit of records that API provides. By default number is set to `10`. Max is `50`.
+- `maxDistance` - Maximum distance from starting point. By default `10000` meters. Max is `50000` meters.
+
+## Other things
+
+- Dates are in `ISO 8601` format.
+- Distances are in `meters`.
+
+## Author
+
+- [Oto Brglez](https://github.com/otobrglez)

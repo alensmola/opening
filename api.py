@@ -9,6 +9,8 @@ from time import time
 from requests import get as requests_get
 from json import loads, dumps
 from slugify import slugify
+import arrow
+from haversine import haversine
 
 app = Flask(__name__)
 app.config['MONGO_URI'] = getenv('MONGO_URI', getenv('MONGO_URL', 'mongodb://localhost:27017/bm'))
@@ -16,6 +18,9 @@ app.config['REDIS_URL'] = getenv('REDIS_URL', 'redis://@localhost:6379/1')
 app.config['LIST_LIMIT'] = getenv('LIST_LIMIT', '50')
 app.config['LIST_DEFAULT_COUNT'] = getenv('LIST_DEFAULT_COUNT', '10')
 app.config['GOOGLE_GEOCODER_TIMEOUT'] = getenv('GOOGLE_GEOCODER_TIMEOUT', '0.10')
+app.config['DISTANCE_DEFAULT'] = getenv('DISTANCE_DEFAULT', '10000')  # 10km
+app.config['DISTANCE_LIMIT'] = getenv('DISTANCE_LIMIT', '50000')  # 50km
+
 mongo = PyMongo(app)
 redis_store = FlaskRedis(app)
 
@@ -27,7 +32,7 @@ def index(): return jsonify(status='ok')
 @app.route('/stations', methods=['GET'])
 def list_stations():
     start = time()
-    keys = ['key', 'loc', 'address', 'updated_at', 'prices']
+    keys = ['key', 'loc', 'address', 'updated_at', 'prices', 'scraped_url']
 
     # If prices are specified then we can perform much faster and less general query
     if request.args.get('prices', None):
@@ -47,22 +52,26 @@ def list_stations():
     if near: at = geocode(near)
 
     # If at is present.
-    if at: where['loc'] = {'$near': {'$geometry': {'type': "Point", 'coordinates': at}, '$maxDistance': 100000}}
+    if at: where['loc'] = {
+        '$near': {'$geometry': {'type': "Point", 'coordinates': at}, '$maxDistance': safe_distance()}
+    }
 
     # Execute lookup agains MongoDB
-    included_keys = keys + ['prices']
+    included_keys = keys + ['prices', 'distance']
     stations = [simple_station(station, included_keys, {
-        'prices': lambda x: unslugify_dict(x),
-    }) for station in mongo.db
-                    .stations
+        'prices': lambda x: enrich_prices(x),
+        'updated_at': lambda x: arrow.get(x).isoformat(),
+    }) for station in mongo.db.stations
                     .find(where, {key: 1 for key in keys})
                     .limit(safe_limit())]
+
+    if at: stations = [compute_distance(station, at) for station in stations]
 
     # Jsonify results
     return jsonify({
         'status': 'ok',
         'stations': stations,
-        'executed_in': '%s' % (time() - start)
+        'executed_in': (time() - start)
     })
 
 
@@ -92,9 +101,24 @@ def geocode(address, cache=True, http_timeout=0.10, expire_ttl=86400):
         return Exception("Can't get location %s." % address)
 
 
+def compute_distance(station, at):
+    """Compute distance between 'at' and station. """
+    station['distance'] = haversine(
+        tuple(station['loc']['coordinates']),
+        tuple(at)
+    ) * 1000.0
+
+    return station
+
+
 def unslugify_dict(dic):
     """ Converts dict with keys that have '-' in them to keys with '_' in them. """
     return {key.replace('-', '_'): value for key, value in dic.items()}
+
+
+def enrich_prices(dic):
+    prices = unslugify_dict(dic)
+    return [{'type': k, 'price': v} for k, v in prices.items()]
 
 
 def simple_station(station, included_keys=None, mapping=None):
@@ -111,10 +135,14 @@ def result_of(mapping, key, value):
     return result if not isinstance(result, LambdaType) else result(value)
 
 
-def safe_limit(key='LIST_LIMIT', default_key='LIST_DEFAULT_COUNT'):
+def safe_limit(key='LIST_LIMIT', default_key='LIST_DEFAULT_COUNT', query_param='limit'):
     """ Hard limits so that people don't go wild. """
-    limit = int(request.args.get('limit', default=app.config.get(default_key)))
+    limit = int(request.args.get(query_param, default=app.config.get(default_key)))
     return limit if limit < int(app.config.get(key)) else int(app.config.get(key))
+
+
+def safe_distance():
+    return safe_limit('DISTANCE_LIMIT', 'DISTANCE_DEFAULT', 'maxDistance')
 
 
 if __name__ == '__main__':
