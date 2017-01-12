@@ -5,3 +5,4 @@ responses
 python-slugify
 haversine
 arrow
+flask-cors

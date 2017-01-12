@@ -3,6 +3,7 @@ from os import getenv
 from flask import Flask, jsonify, request
 from flask_pymongo import PyMongo
 from flask_redis import FlaskRedis
+from flask_cors import CORS, cross_origin
 from types import *
 from pprint import pprint
 from time import time
@@ -13,6 +14,7 @@ import arrow
 from haversine import haversine
 
 app = Flask(__name__)
+CORS(app, resources={r"*": {"origins": "*"}})
 app.config['MONGO_URI'] = getenv('MONGO_URI', getenv('MONGO_URL', 'mongodb://localhost:27017/bm'))
 app.config['REDIS_URL'] = getenv('REDIS_URL', 'redis://@localhost:6379/1')
 app.config['LIST_LIMIT'] = getenv('LIST_LIMIT', '50')
@@ -20,12 +22,12 @@ app.config['LIST_DEFAULT_COUNT'] = getenv('LIST_DEFAULT_COUNT', '10')
 app.config['GOOGLE_GEOCODER_TIMEOUT'] = getenv('GOOGLE_GEOCODER_TIMEOUT', '0.10')
 app.config['DISTANCE_DEFAULT'] = getenv('DISTANCE_DEFAULT', '10000')  # 10km
 app.config['DISTANCE_LIMIT'] = getenv('DISTANCE_LIMIT', '50000')  # 50km
-
 mongo = PyMongo(app)
 redis_store = FlaskRedis(app)
 
 
 @app.route('/')
+@cross_origin()
 def index(): return jsonify(status='ok')
 
 
