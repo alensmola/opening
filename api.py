@@ -39,7 +39,7 @@ def list_stations():
 
     # Coordinates if present are converted into floats.
     raw_at = request.args.get('at', '')
-    at = [float(n) for n in raw_at.split(',')]
+    at = [float(n) for n in raw_at.split(',') if n != '']
     at = None if at is [] else at
 
     # If "near" is present
