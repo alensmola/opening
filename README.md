@@ -1,22 +1,10 @@
 # bencinmonitor / api
 
-## Development
+## Live development with Docker and tunnels
 
 ```bash
 # sudo ifconfig lo0 alias 10.8.8.8 netmask 255.255.255.255 up
 
-docker build -t bencinmonitor/api .
-
-ls **/*.py | entr docker run --rm -ti -e DEBUG=True -v `pwd`:/usr/src/app \
-  --entrypoint python bencinmonitor/api:latest -m unittest **_test.py -v
-
-docker run --rm -ti --name bm_api -p 7766:7766  -e DEBUG=True \
-  -v `pwd`:/usr/src/app bencinmonitor/api:latest
-```
-
-## Live development
-
-```bash
 ./bin/production_tunnels.sh
 
 ngrok http 7766 -region eu --hostname dev.bencinmonitor.si
