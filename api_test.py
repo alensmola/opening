@@ -1,6 +1,7 @@
 import unittest, os, tempfile
 from pprint import pprint
-from json import loads
+from json import loads, dumps
+import requests, responses
 import api
 
 
@@ -18,6 +19,28 @@ class ApiTest(unittest.TestCase):
 
     def test_index(self):
         self.assertEqual(self.get_json('/')['status'], 'ok')
+
+    def test_list_stations(self):
+        stations = self.get_json('/stations')
+        self.assertEqual(stations['status'], 'ok')
+
+    def test_list_stations_near(self):
+        stations = self.get_json('/stations?near=Ljubljana')
+        self.assertEqual(stations['status'], 'ok')
+
+    @responses.activate
+    def test_geocode(self):
+        responses.add(responses.GET, 'http://maps.googleapis.com/maps/api/geocode/json',
+                      dumps({'results': [{'geometry': {'location': {'lat': 1.1, 'lng': 1.1}}}]}))
+        result = api.geocode('Fake Lokacija', cache=False)
+        self.assertEqual(result, [1.1, 1.1])
+
+    @responses.activate
+    def test_geocode_caching(self):
+        responses.add(responses.GET, 'http://maps.googleapis.com/maps/api/geocode/json',
+                      dumps({'results': [{'geometry': {'location': {'lat': 1.1, 'lng': 1.1}}}]}))
+        result = api.geocode('Fake Lokacija')
+        self.assertEqual(result, [1.1, 1.1])
 
 
 if __name__ == '__main__':
